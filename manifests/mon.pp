@@ -89,12 +89,19 @@ define ceph::mon (
     # Everything else that is supported by puppet-ceph should run systemd.
     } else {
       $init = 'sysvinit'
-      Service {
-        name     => "ceph-mon-${id}",
-        provider => $::ceph::params::service_provider,
-        start    => "service ceph start mon.${id}",
-        stop     => "service ceph stop mon.${id}",
-        status   => "service ceph status mon.${id}",
+      if $::operatingsystem == 'Ubuntu' and versioncmp($::operatingsystemrelease, '16.04') >= 0 {
+        Service {
+          name     => "ceph-mon@${id}",
+          provider => $::ceph::params::service_provider,
+        }
+      } else {
+        Service {
+          name     => "ceph-mon-${id}",
+          provider => $::ceph::params::service_provider,
+          start    => "service ceph start mon.${id}",
+          stop     => "service ceph stop mon.${id}",
+          status   => "service ceph status mon.${id}",
+        }
       }
     }
 
@@ -166,7 +173,9 @@ set -ex
 mon_data=\$(ceph-mon ${cluster_option} --id ${id} --show-config-value mon_data)
 if [ ! -d \$mon_data ] ; then
   mkdir -p \$mon_data
+  chown -h ceph:ceph \$mon_data
   if ceph-mon ${cluster_option} \
+        --setuser ceph --setgroup ceph \
         --mkfs \
         --id ${id} \
         --keyring ${keyring_path} ; then
